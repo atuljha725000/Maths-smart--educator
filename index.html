@@ -144,20 +144,101 @@
   // https://firebase.google.com/docs/web/setup#available-libraries
 
   // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+  // Aapka Firebase Config
+
   const firebaseConfig = {
     apiKey: "AIzaSyBjLuUMpA4l8tM6FptrFlfiZuPYX0BQZ7Y",
     authDomain: "website-c1c00.firebaseapp.com",
+    databaseURL: "https://website-c1c00-default-rtdb.firebaseio.com", // Yeh maine add kiya hai
     projectId: "website-c1c00",
     storageBucket: "website-c1c00.firebasestorage.app",
     messagingSenderId: "819641216160",
-    appId: "1:819641216160:web:6c5e83f1d63e14466f2dc5",
-    measurementId: "G-JC1XPSSCPQ"
+    appId: "1:819641216160:web:6c5e83f1d63e14466f2dc5"
   };
 
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
+  const db = getDatabase(app);
+
+  // --- 1. STUDENT JAB QUESTION PUCHTA HAI ---
+  window.handleStudentSubmit = async (e) => {
+    e.preventDefault();
+    const chap = document.getElementById('chapterSelect').value;
+    const ex = document.getElementById('exSelect').value;
+    const qIdx = document.getElementById('qSelect').value;
+    
+    if(!chap || !ex || qIdx === "") return alert("Pehle question select karein!");
+
+    const qText = ncertDatabase[chap][ex][qIdx];
+    
+    // Database mein save karna
+    const requestRef = ref(db, 'requests');
+    const newRequestRef = push(requestRef);
+    
+    await set(newRequestRef, {
+        id: Date.now(),
+        user: currentUser,
+        chapter: chap,
+        exercise: ex,
+        question: qText,
+        solution: null, // Shuru mein khali
+        status: "pending"
+    });
+
+    document.getElementById('statusArea').innerText = "Request sent to Faculty!";
+  };
+
+  // --- 2. FACULTY/ADMIN KE LIYE DATA LOAD KARNA ---
+  window.renderAdminTasks = () => {
+    const container = document.getElementById('pendingQuestions');
+    const requestRef = ref(db, 'requests');
+
+    onValue(requestRef, (snapshot) => {
+        const data = snapshot.val();
+        container.innerHTML = ""; 
+        for (let id in data) {
+            if (!data[id].solution) { // Sirf pending wale dikhao
+                const div = document.createElement('div');
+                div.className = "admin-item";
+                div.innerHTML = `
+                    <p><strong>User:</strong> ${data[id].user}</p>
+                    <p><strong>Q:</strong> ${data[id].question}</p>
+                    <textarea id="sol-${id}" placeholder="Type Answer Here..."></textarea>
+                    <button class="main-btn" onclick="publishSolution('${id}')">Send Answer</button>
+                `;
+                container.appendChild(div);
+            }
+        }
+    });
+  };
+
+  // --- 3. FACULTY JAB ANSWER DETA HAI ---
+  window.publishSolution = (id) => {
+    const solText = document.getElementById(`sol-${id}`).value;
+    if(!solText) return alert("Answer toh likho bhai!");
+
+    set(ref(db, 'requests/' + id + '/solution'), solText);
+    alert("Answer bhej diya gaya!");
+  };
+
+  // --- 4. STUDENT KO ANSWER DIKHANA ---
+  const requestRef = ref(db, 'requests');
+  onValue(requestRef, (snapshot) => {
+      const data = snapshot.val();
+      for (let id in data) {
+          if (data[id].user === currentUser && data[id].solution) {
+              document.getElementById('solutionDisplay').classList.remove('hidden');
+              document.getElementById('solutionText').innerText = data[id].solution;
+              document.getElementById('statusArea').innerText = "Faculty ne jawab de diya hai!";
+          }
+      }
+  });
+
+
 </script>
     <div class="bg-gradient"></div>
     <div class="math-overlay"></div>
